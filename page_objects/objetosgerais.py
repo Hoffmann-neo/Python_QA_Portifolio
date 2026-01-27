@@ -14,124 +14,145 @@ class ObjetosGerais:
         self.botao_back_home = page.locator('#back-to-products')
         self.botao_continue = page.locator('#continue')
         self.botao_finish = page.locator('#finish')
+        self.botao_add = page.locator('#addNewRecordButton')
+        self.botao_editar = page.locator('#edit-record')
+        self.botao_excluir = page.locator('#delete-record')
+
 
     def validar_grid(
-            self,
-            grid_locator: str,
-            esperado,
-            timeout: int = 30000,
-            normalizar: bool = True,
-            parcial: bool = True
+        self,
+        grid_locator: str,
+        esperado,
+        timeout: int = 30000,
+        normalizar: bool = True,
+        parcial: bool = True
     ):
         """
-        Valida textos dentro de qualquer container.
+        Valida textos dentro de qualquer container da página.
 
-        Funciona para:
+        Serve para:
+        - tabelas
         - grids
         - listas
-        - outputs
-        - carrinhos
         - resumos
+        - outputs
+        - carrinho
         - formulários
 
-        esperado pode ser:
-        - list  -> ["Texto A", "Texto B"]
-        - dict  -> {"campo": "valor"}
-        - str   -> "Texto único"
+        Parâmetro "esperado" pode ser:
+
+        - str  → "Texto único"
+        - list → ["Texto A", "Texto B"]
+        - dict → {"campo": "valor"}  (usa só os valores)
         """
 
-        # -------------------------
-        # Normalização
-        # -------------------------
+        # =========================================
+        # FUNÇÃO PARA LIMPAR / PADRONIZAR TEXTO
+        # =========================================
         def limpar(texto: str) -> str:
+            """
+            Remove diferenças de maiúscula, espaços e símbolos.
+            Ajuda a evitar erro por detalhe bobo.
+            """
 
             if not normalizar:
                 return texto.strip()
 
+            # Tudo minúsculo
             texto = texto.lower()
 
+            # Remove espaços repetidos
             texto = re.sub(r"\s+", " ", texto)
 
+            # Remove símbolos estranhos
             texto = re.sub(r"[^\w\sáéíóúâêôãõç]", "", texto)
 
             return texto.strip()
 
-        # -------------------------
-        # Localiza container
-        # -------------------------
+        # =========================================
+        # LOCALIZA O CONTAINER (GRID / DIV / BLOCO)
+        # =========================================
         container = self.page.locator(grid_locator)
 
+        # Espera aparecer na tela
         expect(container).to_be_visible(timeout=timeout)
 
-        elementos = container.locator("*")
+        # Pega TODO texto de dentro (mais seguro)
+        texto_bruto = container.text_content(timeout=timeout)
 
-        expect(elementos.first).to_be_visible(timeout=timeout)
+        if not texto_bruto:
+            raise AssertionError("❌ Nenhum texto encontrado no container")
 
-        textos_tela = []
+        # =========================================
+        # QUEBRA TEXTO EM LINHAS
+        # =========================================
+        linhas = [
+            limpar(linha)
+            for linha in texto_bruto.split("\n")
+            if linha.strip()
+        ]
 
-        total = elementos.count()
+        # Texto completo em uma linha só
+        texto_completo = " ".join(linhas)
 
-        for i in range(total):
+        # =========================================
+        # DEBUG → MOSTRA NO TERMINAL
+        # =========================================
+        print("\n📌 Textos encontrados na tela:")
 
-            texto = elementos.nth(i).inner_text(timeout=timeout).strip()
-
-            if texto:
-                textos_tela.append(limpar(texto))
-
-        # Junta tudo também
-        texto_completo = " ".join(textos_tela)
-
-        # -------------------------
-        # Debug
-        # -------------------------
-        print("\n📌 Textos encontrados:")
-        for t in textos_tela:
+        for t in linhas:
             print("-", t)
 
-        # -------------------------
-        # Prepara esperado
-        # -------------------------
+        # =========================================
+        # ORGANIZA O ESPERADO
+        # =========================================
         esperados = []
 
+        # Se for string
         if isinstance(esperado, str):
             esperados = [esperado]
 
+        # Se for lista
         elif isinstance(esperado, list):
             esperados = esperado
 
+        # Se for dicionário → usa só valores
         elif isinstance(esperado, dict):
             esperados = list(esperado.values())
 
         else:
-            raise TypeError("esperado deve ser str, list ou dict")
+            raise TypeError("❌ esperado deve ser str, list ou dict")
 
+        # Limpa todos
         esperados = [limpar(e) for e in esperados]
 
-        # -------------------------
-        # Validação
-        # -------------------------
+        # =========================================
+        # VALIDAÇÃO
+        # =========================================
         erros = []
 
         for valor in esperados:
 
+            # Procura dentro do texto inteiro
             if parcial:
                 encontrado = valor in texto_completo
+
+            # Procura exatamente na lista
             else:
-                encontrado = valor in textos_tela
+                encontrado = valor in linhas
 
             if not encontrado:
                 erros.append(f"❌ Não encontrado: {valor}")
 
-        # -------------------------
-        # Resultado
-        # -------------------------
+        # =========================================
+        # RESULTADO FINAL
+        # =========================================
         if erros:
             raise AssertionError(
-                "\n\n".join(erros)
+                "\n".join(erros)
                 + "\n\n📌 Texto da tela:\n"
                 + texto_completo
             )
 
         print("\n✅ Validação concluída com sucesso")
-
 
