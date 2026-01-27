@@ -2,6 +2,16 @@ from pages.text_box import TextBox
 
 
 def test_text_box(page):
+    """
+    - Acessar site DemoQA text box
+    - Preencher:
+        - nome='Teste de fulano',
+        - email='fulano@gmail.com',
+        - endereco atual='Rua cecilia capital',
+        - endereco permanente='Av goularte camara'
+    - clicar botao submit
+    - validar grid
+    """
     text_box = TextBox(page)
     text_box.acessar_text_box()
     text_box.preencher_text_box(

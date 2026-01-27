@@ -11,42 +11,63 @@ class ObjetosGerais:
         self.botao_add_to_cart = page.locator('#add-to-cart')
         self.botao_voltar = page.locator('#back-to-products')
         self.botao_carrinho_compras = page.locator('#shopping_cart_container')
+        self.botao_back_home = page.locator('#back-to-products')
+        self.botao_continue = page.locator('#continue')
+        self.botao_finish = page.locator('#finish')
 
     def validar_grid(
             self,
             grid_locator: str,
-            esperado: dict,
+            esperado,
             timeout: int = 30000,
-            separador=":"
+            normalizar: bool = True,
+            parcial: bool = True
     ):
         """
-        Valida qualquer output baseado em texto exibido na tela.
+        Valida textos dentro de qualquer container.
 
-        Exemplo esperado:
+        Funciona para:
+        - grids
+        - listas
+        - outputs
+        - carrinhos
+        - resumos
+        - formulários
 
-        {
-            "name": "Fulano",
-            "email": "teste@email.com"
-        }
+        esperado pode ser:
+        - list  -> ["Texto A", "Texto B"]
+        - dict  -> {"campo": "valor"}
+        - str   -> "Texto único"
         """
 
-        def normalizar(texto: str) -> str:
-            """
-            Remove caracteres especiais, espaços e deixa minúsculo.
-            """
-            return re.sub(r"[^a-z0-9]", "", texto.lower())
+        # -------------------------
+        # Normalização
+        # -------------------------
+        def limpar(texto: str) -> str:
 
+            if not normalizar:
+                return texto.strip()
+
+            texto = texto.lower()
+
+            texto = re.sub(r"\s+", " ", texto)
+
+            texto = re.sub(r"[^\w\sáéíóúâêôãõç]", "", texto)
+
+            return texto.strip()
+
+        # -------------------------
         # Localiza container
+        # -------------------------
         container = self.page.locator(grid_locator)
 
         expect(container).to_be_visible(timeout=timeout)
 
-        # Busca qualquer texto dentro
         elementos = container.locator("*")
 
         expect(elementos.first).to_be_visible(timeout=timeout)
 
-        dados_tela = {}
+        textos_tela = []
 
         total = elementos.count()
 
@@ -54,60 +75,63 @@ class ObjetosGerais:
 
             texto = elementos.nth(i).inner_text(timeout=timeout).strip()
 
-            if not texto:
-                continue
+            if texto:
+                textos_tela.append(limpar(texto))
 
-            # Remove espaços invisíveis
-            texto = " ".join(texto.split())
+        # Junta tudo também
+        texto_completo = " ".join(textos_tela)
 
-            if separador not in texto:
-                continue
+        # -------------------------
+        # Debug
+        # -------------------------
+        print("\n📌 Textos encontrados:")
+        for t in textos_tela:
+            print("-", t)
 
-            chave, valor = texto.split(separador, 1)
+        # -------------------------
+        # Prepara esperado
+        # -------------------------
+        esperados = []
 
-            chave = normalizar(chave)
-            valor = valor.strip()
+        if isinstance(esperado, str):
+            esperados = [esperado]
 
-            if chave and valor:
-                dados_tela[chave] = valor
+        elif isinstance(esperado, list):
+            esperados = esperado
 
-        # Debug automático
-        print("\n📌 Dados encontrados na tela:")
-        for k, v in dados_tela.items():
-            print(f"{k}: {v}")
+        elif isinstance(esperado, dict):
+            esperados = list(esperado.values())
 
+        else:
+            raise TypeError("esperado deve ser str, list ou dict")
+
+        esperados = [limpar(e) for e in esperados]
+
+        # -------------------------
         # Validação
+        # -------------------------
         erros = []
 
-        for campo, esperado_valor in esperado.items():
+        for valor in esperados:
 
-            campo_norm = normalizar(campo)
+            if parcial:
+                encontrado = valor in texto_completo
+            else:
+                encontrado = valor in textos_tela
 
-            tela_valor = dados_tela.get(campo_norm)
+            if not encontrado:
+                erros.append(f"❌ Não encontrado: {valor}")
 
-            if tela_valor is None:
-                erros.append(
-                    f"Campo '{campo}' não encontrado"
-                )
-                continue
-
-            if tela_valor != esperado_valor:
-                erros.append(
-                    f"{campo} | Esperado: '{esperado_valor}' | Tela: '{tela_valor}'"
-                )
-
+        # -------------------------
+        # Resultado
+        # -------------------------
         if erros:
-            msg = "\n".join(erros)
-
             raise AssertionError(
-                f"""
-    ❌ ERROS NA VALIDAÇÃO
-
-    {msg}
-
-    📌 Tela:
-    {dados_tela}
-    """
+                "\n\n".join(erros)
+                + "\n\n📌 Texto da tela:\n"
+                + texto_completo
             )
 
-        print("\n✅ Grid validado com sucesso")
+        print("\n✅ Validação concluída com sucesso")
+
+
