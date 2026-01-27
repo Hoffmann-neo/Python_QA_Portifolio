@@ -33,6 +33,7 @@ Este projeto demonstra minha experiência prática como **QA**, atuando desde a 
 Aplicação web pública utilizada para fins de estudo e automação:
 
 🔗 https://demoqa.com/webtables
+🔗 https://www.saucedemo.com
 
 ---
 
